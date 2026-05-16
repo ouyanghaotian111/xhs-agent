@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>王高兴牛逼 — AI PM 小红书内容工作台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Noto Sans SC', 'Inter', 'sans-serif'] },
+      colors: {
+        brand: { 50:'#fff1f2', 100:'#ffe4e6', 200:'#fecdd3', 300:'#fda4af', 400:'#fb7185', 500:'#f43f5e', 600:'#e11d48', 700:'#be123c' },
+        dark: { 50:'#f8fafc', 100:'#f1f5f9', 200:'#e2e8f0', 300:'#cbd5e1', 400:'#94a3b8', 500:'#64748b', 600:'#475569', 700:'#334155', 800:'#1e293b', 900:'#0f172a', 950:'#020617' }
+      }
+    }
+  }
+}
+</script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Noto Sans SC', 'Inter', sans-serif; background: #0f172a; color: #e2e8f0; }
+  .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.1); }
+  .glass-light { background: rgba(51, 65, 85, 0.4); backdrop-filter: blur(8px); border: 1px solid rgba(148, 163, 184, 0.08); }
+  .glow { box-shadow: 0 0 20px rgba(244, 63, 94, 0.15); }
+  .glow-blue { box-shadow: 0 0 20px rgba(56, 189, 248, 0.15); }
+  textarea, input { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(148, 163, 184, 0.15); }
+  textarea:focus, input:focus { outline: none; border-color: #f43f5e; box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.2); }
+  .btn-primary { background: linear-gradient(135deg, #f43f5e, #e11d48); transition: all 0.2s; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(244, 63, 94, 0.4); }
+  .btn-secondary { background: rgba(51, 65, 85, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); transition: all 0.2s; }
+  .btn-secondary:hover { background: rgba(71, 85, 105, 0.6); }
+  .tab-active { background: rgba(244, 63, 94, 0.15); color: #fb7185; border-bottom: 2px solid #f43f5e; }
+  .tab-inactive { color: #94a3b8; border-bottom: 2px solid transparent; }
+  .tab-inactive:hover { color: #cbd5e1; background: rgba(51, 65, 85, 0.3); }
+  .step-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .step-active { background: #f43f5e; box-shadow: 0 0 8px rgba(244, 63, 94, 0.6); }
+  .step-done { background: #22c55e; }
+  .step-waiting { background: #475569; }
+  .step-line { height: 2px; flex: 1; }
+  .markdown-output h1, .markdown-output h2, .markdown-output h3 { font-weight: 700; margin: 0.8em 0 0.4em; }
+  .markdown-output h1 { font-size: 1.3em; color: #fb7185; }
+  .markdown-output h2 { font-size: 1.15em; color: #38bdf8; }
+  .markdown-output h3 { font-size: 1.05em; color: #a78bfa; }
+  .markdown-output p { margin: 0.5em 0; line-height: 1.7; }
+  .markdown-output ul, .markdown-output ol { padding-left: 1.5em; margin: 0.5em 0; }
+  .markdown-output li { margin: 0.3em 0; line-height: 1.6; }
+  .markdown-output strong { color: #fbbf24; }
+  .markdown-output em { color: #a78bfa; }
+  .markdown-output code { background: rgba(244, 63, 94, 0.1); color: #fb7185; padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+  .markdown-output blockquote { border-left: 3px solid #f43f5e; padding-left: 1em; color: #94a3b8; margin: 0.8em 0; }
+  .markdown-output table { width: 100%; border-collapse: collapse; margin: 0.8em 0; font-size: 0.9em; }
+  .markdown-output th { background: rgba(51,65,85,0.5); padding: 0.5em; text-align: left; border-bottom: 2px solid rgba(148,163,184,0.2); }
+  .markdown-output td { padding: 0.5em; border-bottom: 1px solid rgba(148,163,184,0.1); }
+  .score-ring { width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.4em; font-weight: 700; }
+  @keyframes pulse-glow { 0%,100% { opacity: 0.6; } 50% { opacity: 1; } }
+  .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+  @keyframes typing { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+  .typing-dot { animation: typing 1.4s infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  .slide-in { animation: slideIn 0.3s ease-out; }
+  @keyframes slideIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  .material-card { transition: all 0.2s; }
+  .material-card:hover { transform: translateY(-2px); border-color: rgba(244, 63, 94, 0.3); }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.2); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,0.4); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="glass sticky top-0 z-50 px-6 py-3 flex items-center justify-between">
+  <div class="flex items-center gap-3">
+    <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-white font-bold text-sm">牛</div>
+    <div>
+      <h1 class="text-lg font-bold text-white">王高兴牛逼</h1>
+      <p class="text-xs text-dark-400">AI PM 小红书内容工作台</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-3">
+    <div id="statusBadge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs glass-light">
+      <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      <span class="text-dark-300">就绪</span>
+    </div>
+    <button onclick="openSettings()" class="p-2 rounded-lg hover:bg-dark-700 transition text-dark-400 hover:text-white">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+  </div>
+</header>
+
+<!-- Main Layout -->
+<main class="flex h-[calc(100vh-57px)]">
+
+  <!-- Left Panel -->
+  <div class="w-[420px] min-w-[380px] flex flex-col border-r border-dark-700/50">
+
+    <!-- Tabs -->
+    <div class="flex border-b border-dark-700/50 px-2">
+      <button onclick="switchTab('material')" id="tab-material" class="tab-active px-4 py-3 text-sm font-medium transition">📥 素材输入</button>
+      <button onclick="switchTab('topics')" id="tab-topics" class="tab-inactive px-4 py-3 text-sm font-medium transition">💡 选题策划</button>
+      <button onclick="switchTab('library')" id="tab-library" class="tab-inactive px-4 py-3 text-sm font-medium transition">📚 素材库</button>
+    </div>
+
+    <!-- Tab: Material Input -->
+    <div id="panel-material" class="flex-1 flex flex-col p-4 gap-4 overflow-auto">
+      <div>
+        <label class="text-xs text-dark-400 mb-1.5 block">素材类型</label>
+        <div class="flex gap-2">
+          <button onclick="setSourceType('随笔')" id="src-随笔" class="px-3 py-1.5 rounded-lg text-xs btn-primary text-white">✍️ 随笔</button>
+          <button onclick="setSourceType('博客')" id="src-博客" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">📝 博客</button>
+          <button onclick="setSourceType('视频')" id="src-视频" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">🎬 视频</button>
+          <button onclick="setSourceType('笔记')" id="src-笔记" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">🗂️ 笔记</button>
+        </div>
+      </div>
+      <div class="flex-1 flex flex-col">
+        <label class="text-xs text-dark-400 mb-1.5 block">粘贴素材内容 / URL</label>
+        <textarea id="materialInput" class="flex-1 min-h-[200px] rounded-xl p-4 text-sm text-dark-200 resize-none placeholder-dark-500" placeholder="在这里粘贴你的随笔、博客链接、视频链接或 Obsidian 笔记内容...&#10;&#10;例如：&#10;今天和团队讨论了一个问题：用户其实不需要AI，用户需要的是更快完成任务。很多AI产品失败，就是因为把'用AI'当成了卖点，而不是把'效率提升'当成卖点。"></textarea>
+      </div>
+      <div>
+        <label class="text-xs text-dark-400 mb-1.5 block">内容形式</label>
+        <div class="flex gap-2">
+          <button onclick="setFormat('auto')" id="fmt-auto" class="px-3 py-1.5 rounded-lg text-xs btn-primary text-white">🤖 自动</button>
+          <button onclick="setFormat('图文笔记')" id="fmt-图文笔记" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">📄 图文</button>
+          <button onclick="setFormat('轮播图')" id="fmt-轮播图" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">🎠 轮播</button>
+          <button onclick="setFormat('视频脚本')" id="fmt-视频脚本" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">🎬 视频</button>
+        </div>
+      </div>
+      <div>
+        <label class="text-xs text-dark-400 mb-1.5 block">写作风格</label>
+        <div class="flex gap-2">
+          <button onclick="setStyle('干货型')" id="sty-干货型" class="px-3 py-1.5 rounded-lg text-xs btn-primary text-white">📌 干货型</button>
+          <button onclick="setStyle('故事型')" id="sty-故事型" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">📖 故事型</button>
+          <button onclick="setStyle('对比评测型')" id="sty-对比评测型" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">⚖️ 评测型</button>
+          <button onclick="setStyle('教程型')" id="sty-教程型" class="px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300">📘 教程型</button>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="runFullPipeline()" class="flex-1 btn-primary text-white py-3 rounded-xl font-medium text-sm flex items-center justify-center gap-2">
+          ⚡ 一键全流程生成
+        </button>
+        <button onclick="runSingleAgent('material')" class="btn-secondary text-dark-300 py-3 px-4 rounded-xl text-sm">仅采集</button>
+      </div>
+    </div>
+
+    <!-- Tab: Topics -->
+    <div id="panel-topics" class="flex-1 flex flex-col p-4 gap-4 overflow-auto hidden">
+      <p class="text-sm text-dark-400">基于已有素材库，AI 为你推荐高潜力选题：</p>
+      <button onclick="runSingleAgent('topic')" class="btn-primary text-white py-3 rounded-xl font-medium text-sm">💡 生成选题推荐</button>
+      <div id="topicsList" class="flex flex-col gap-3"></div>
+    </div>
+
+    <!-- Tab: Library -->
+    <div id="panel-library" class="flex-1 flex flex-col p-4 gap-3 overflow-auto hidden">
+      <div class="flex items-center justify-between">
+        <p class="text-sm text-dark-400">已采集素材</p>
+        <span id="libraryCount" class="text-xs text-dark-500">0 条</span>
+      </div>
+      <div id="libraryList" class="flex flex-col gap-2">
+        <p class="text-xs text-dark-500 text-center py-8">还没有素材，去"素材输入"标签投喂吧</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Panel -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- Pipeline Status Bar -->
+    <div class="px-6 py-3 border-b border-dark-700/50 glass-light">
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1 flex-1">
+          <div id="dot-material" class="step-dot step-waiting"></div>
+          <span class="text-xs text-dark-400">素材采集</span>
+          <div class="step-line bg-dark-700 mx-1"></div>
+          <div id="dot-topic" class="step-dot step-waiting"></div>
+          <span class="text-xs text-dark-400">选题策划</span>
+          <div class="step-line bg-dark-700 mx-1"></div>
+          <div id="dot-create" class="step-dot step-waiting"></div>
+          <span class="text-xs text-dark-400">内容创作</span>
+          <div class="step-line bg-dark-700 mx-1"></div>
+          <div id="dot-review" class="step-dot step-waiting"></div>
+          <span class="text-xs text-dark-400">内容审核</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Output Area -->
+    <div class="flex-1 overflow-auto p-6" id="outputArea">
+      <!-- Welcome State -->
+      <div id="welcomeState" class="flex flex-col items-center justify-center h-full text-center">
+        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-500/20 to-brand-700/20 border border-brand-500/20 flex items-center justify-center text-4xl mb-6">🧠</div>
+        <h2 class="text-2xl font-bold text-white mb-2">王高兴牛逼</h2>
+        <p class="text-dark-400 mb-8 max-w-md">AI 产品经理的小红书内容工作台。投喂素材，一键生成图文笔记、轮播图文案、视频脚本。</p>
+        <div class="grid grid-cols-3 gap-4 max-w-lg">
+          <div class="glass-light rounded-xl p-4 text-center">
+            <div class="text-2xl mb-2">📥</div>
+            <p class="text-xs text-dark-300">投喂素材<br>自动结构化</p>
+          </div>
+          <div class="glass-light rounded-xl p-4 text-center">
+            <div class="text-2xl mb-2">✍️</div>
+            <p class="text-xs text-dark-300">AI 创作<br>图文/轮播/视频</p>
+          </div>
+          <div class="glass-light rounded-xl p-4 text-center">
+            <div class="text-2xl mb-2">🔍</div>
+            <p class="text-xs text-dark-300">质量审核<br>5维评分优化</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loadingState" class="hidden flex flex-col items-center justify-center h-full">
+        <div class="flex gap-2 mb-4">
+          <div class="typing-dot w-3 h-3 rounded-full bg-brand-400"></div>
+          <div class="typing-dot w-3 h-3 rounded-full bg-brand-400"></div>
+          <div class="typing-dot w-3 h-3 rounded-full bg-brand-400"></div>
+        </div>
+        <p id="loadingText" class="text-dark-400 text-sm">正在处理...</p>
+      </div>
+
+      <!-- Result State -->
+      <div id="resultState" class="hidden">
+        <div id="resultContent" class="space-y-6"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60 backdrop-blur-sm">
+  <div class="glass rounded-2xl w-[520px] max-h-[80vh] overflow-auto p-6 glow slide-in">
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="text-lg font-bold text-white">⚙️ 设置</h3>
+      <button onclick="closeSettings()" class="text-dark-400 hover:text-white transition">✕</button>
+    </div>
+    <div class="space-y-5">
+      <div>
+        <label class="text-sm text-dark-300 mb-1.5 block font-medium">API Provider</label>
+        <select id="cfgProvider" onchange="onProviderChange()" class="w-full rounded-lg px-3 py-2 text-sm bg-dark-900/60 border border-dark-600/30 text-dark-200">
+          <option value="aihubmix">AIHubMix (推荐)</option>
+          <option value="openai">OpenAI (GPT-4o-mini)</option>
+          <option value="deepseek">DeepSeek 直连</option>
+          <option value="doubao">豆包 (Doubao)</option>
+          <option value="custom">自定义 API</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm text-dark-300 mb-1.5 block font-medium">API Key</label>
+        <input id="cfgApiKey" type="password" class="w-full rounded-lg px-3 py-2 text-sm text-dark-200" placeholder="sk-...">
+      </div>
+      <div>
+        <label class="text-sm text-dark-300 mb-1.5 block font-medium">API Base URL</label>
+        <input id="cfgBaseUrl" class="w-full rounded-lg px-3 py-2 text-sm text-dark-200" placeholder="https://api.openai.com/v1">
+      </div>
+      <div>
+        <label class="text-sm text-dark-300 mb-1.5 block font-medium">模型名称</label>
+        <input id="cfgModel" class="w-full rounded-lg px-3 py-2 text-sm text-dark-200" placeholder="gpt-4o-mini">
+      </div>
+      <hr class="border-dark-700">
+      <div>
+        <label class="text-sm text-dark-300 mb-1.5 block font-medium">人设名称</label>
+        <input id="cfgPersona" class="w-full rounded-lg px-3 py-2 text-sm text-dark-200" value="AI产品实战派">
+      </div>
+      <div>
+        <label class="text-sm text-dark-300 mb-1.5 block font-medium">人设 Tagline</label>
+        <input id="cfgTagline" class="w-full rounded-lg px-3 py-2 text-sm text-dark-200" value="前大厂AI PM，分享产品落地干货">
+      </div>
+      <button onclick="saveSettings()" class="w-full btn-primary text-white py-2.5 rounded-xl font-medium text-sm">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============== State ==============
+let state = {
+  sourceType: '随笔',
+  format: 'auto',
+  style: '干货型',
+  materials: JSON.parse(localStorage.getItem('wgxnb_materials') || '[]'),
+  history: JSON.parse(localStorage.getItem('wgxnb_history') || '[]'),
+  config: JSON.parse(localStorage.getItem('wgxnb_config') || JSON.stringify({
+    provider: 'aihubmix',
+    apiKey: '',
+    baseUrl: 'https://aihubmix.com/v1',
+    model: 'deepseek-v3.2',
+    persona: 'AI产品实战派',
+    tagline: '前大厂AI PM，分享产品落地干货'
+  }))
+};
+
+// ============== Prompts ==============
+function getSystemPrompt(agent) {
+  const persona = state.config.persona;
+  const tagline = state.config.tagline;
+  const prompts = {
+    material: `你是一位专业的内容素材分析师，擅长从各类非结构化输入中提取核心知识并结构化。你为一位 AI 产品经理的小红书自媒体账号服务，账号覆盖 AI 产品方法论、AI 行业洞察、技术科普三大方向。
+
+处理规则：
+1. 提取3-5个核心观点（一句话概括）
+2. 提取1-3个值得引用的金句
+3. 生成200字以内结构化摘要
+4. 打2-5个标签，归属：技术概念/产品方法/行业动态/工具评测/职场成长/案例分析
+5. 判定内容方向：AI产品方法论/AI行业洞察/技术科普
+6. 给出1-3个小红书切入角度，每个含推荐形式(图文/轮播/视频)和hook建议
+7. 中文优先，技术术语保留英文
+
+请用以下Markdown格式输出：
+## 📥 素材分析卡片
+**标题**: [15字以内]
+**类型**: [随笔/博客/视频/笔记]
+**方向**: [AI产品方法论/AI行业洞察/技术科普]
+**标签**: [标签1] [标签2] ...
+
+### 核心观点
+1. xxx
+2. xxx
+
+### 金句摘录
+> "xxx"
+
+### 结构化摘要
+xxx
+
+### 📌 小红书切入角度
+| 角度 | 推荐形式 | Hook建议 | 吸引力 |
+|------|---------|---------|--------|
+| xxx | 图文/轮播/视频 | "xxx" | ⭐⭐⭐⭐ |`,
+
+    topic: `你是一位小红书爆款内容策略师，精通平台算法逻辑和用户心理。账号定位是「AI 产品经理」，覆盖 AI 产品方法论(40%)、AI 行业洞察(35%)、技术科普(25%) 三大方向。
+
+基于用户提供的素材库内容，生成3个高潜力选题。每个选题评分维度：话题热度(25%)、实用价值(30%)、差异化(20%)、人设匹配(15%)、互动潜力(10%)。
+
+请用以下Markdown格式输出：
+## 📋 本期选题推荐
+
+### 🥇 选题1: [标题]
+- **方向**: xxx
+- **形式**: 图文笔记/轮播图(Xp)/视频脚本
+- **综合评分**: ⭐⭐⭐⭐⭐ (X.X/5.0)
+- **目标读者**: xxx
+- **核心卖点**: xxx
+
+#### 内容大纲
+1. **Hook**: "xxx"
+2. **痛点/问题**: xxx
+3. **核心内容**: 要点A / 要点B / 要点C
+4. **案例/证据**: xxx
+5. **行动建议**: xxx
+6. **CTA**: xxx
+
+#### 标题备选
+1. "标题A"
+2. "标题B"
+3. "标题C"
+
+---
+（同格式输出选题2、选题3）`,
+
+    create: `你是一位小红书顶级内容创作者，同时精通 AI 产品领域。你的文字既有专业深度，又有小红书的"呼吸感"——让读者觉得在跟一个懂行的朋友聊天。
+
+你服务的账号人设是「${persona}」——${tagline}。
+
+人设标准：
+- 专业但不高冷：用大白话讲清楚复杂概念
+- 有观点有态度：敢说真话，不做中庸的信息搬运工
+- 实战派：所有建议都来自真实经验
+- 标志性用语：适时使用"说个反直觉的事"、"这个坑我替你踩过了"
+
+写作规则：
+- 标题20字以内，含数字+痛点/好奇心
+- 段落不超过4行，保持"呼吸感"
+- 每2-3段用emoji分隔，不过度
+- 数据案例用具体数字
+- 结尾必须有CTA
+- 话题标签3-8个
+
+图文笔记：800-1200字，Hook→痛点→核心观点→案例→行动建议→CTA
+轮播图(6-10P)：每页80-150字，一个信息点。P1封面+P2问题+P3-P7要点+P8总结+P9 CTA
+视频脚本：口播250字/分钟，含时间戳+口播文案+画面描述+字幕重点
+
+输出完整内容终稿 + 3个备选标题 + 话题标签 + 封面文案建议。`,
+
+    review: `你是一位小红书内容质量总监，同时也是平台规则专家和SEO优化师。审核内容来自账号「${persona}」。
+
+5大审核维度（各打分0-100）：
+1. 平台合规(20%): 违禁词/广告法/社区规范
+2. SEO优化(25%): 关键词/标题/标签
+3. 可读性(25%): Hook/段落/逻辑/金句/CTA
+4. 差异化(15%): 观点独特性/角度新意
+5. 视觉建议(15%): 封面风格/配色/配图
+
+请用以下格式输出：
+## 🔍 内容审核报告
+
+### 📊 综合评分: XX/100
+
+| 维度 | 得分 | 权重 | 状态 |
+|------|------|------|------|
+| 平台合规 | XX | 20% | ✅/⚠️ |
+| SEO优化 | XX | 25% | ✅/⚠️ |
+| 可读性 | XX | 25% | ✅/⚠️ |
+| 差异化 | XX | 15% | ✅/⚠️ |
+| 视觉建议 | XX | 15% | ✅/⚠️ |
+
+### ⚠️ 需修改项
+1. **[优先级]** 问题 → 建议
+
+### ✨ 亮点
+- xxx
+
+### 📝 优化后终稿
+[完整的优化后内容]
+
+### 🖼️ 视觉建议
+- **封面风格**: xxx
+- **封面文案**: 大字: "xxx" / 副标题: "xxx"
+- **配色方案**: xxx
+
+### 📈 预估表现
+- **预估互动率**: X%
+- **最佳发布时间**: xx:xx`
+  };
+  return prompts[agent];
+}
+
+// ============== API Call ==============
+async function callLLM(systemPrompt, userMessage, onChunk) {
+  const { apiKey, baseUrl, model } = state.config;
+  if (!apiKey) { alert('请先在设置中配置 API Key'); openSettings(); return null; }
+
+  const response = await fetch('/api/proxy', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      targetUrl: `${baseUrl}/chat/completions`,
+      apiKey: apiKey,
+      payload: {
+        model: model,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }],
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 4096
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`API Error ${response.status}: ${err}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let full = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value);
+    const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
+    for (const line of lines) {
+      const data = line.slice(6);
+      if (data === '[DONE]') continue;
+      try {
+        const json = JSON.parse(data);
+        const delta = json.choices?.[0]?.delta?.content || '';
+        if (delta) { full += delta; if (onChunk) onChunk(full); }
+      } catch(e) {}
+    }
+  }
+  return full;
+}
+
+// ============== Markdown Renderer ==============
+function renderMarkdown(md) {
+  let html = md
+    .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/`(.+?)`/g, '<code>$1</code>')
+    .replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>')
+    .replace(/^---$/gm, '<hr class="border-dark-700 my-4">')
+    .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
+    .replace(/^- (.*$)/gm, '<li>$1</li>');
+
+  // Tables
+  html = html.replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)*)/g, (match, header, body) => {
+    const ths = header.split('|').filter(c=>c.trim()).map(c=>`<th>${c.trim()}</th>`).join('');
+    const rows = body.trim().split('\n').map(row => {
+      const tds = row.split('|').filter(c=>c.trim()).map(c=>`<td>${c.trim()}</td>`).join('');
+      return `<tr>${tds}</tr>`;
+    }).join('');
+    return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+  });
+
+  html = html.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>');
+  html = `<p>${html}</p>`;
+  html = html.replace(/<p><(h[123]|table|blockquote|hr|li)/g, '<$1');
+  html = html.replace(/<\/(h[123]|table|blockquote|hr|li)><\/p>/g, '</$1>');
+  return html;
+}
+
+// ============== Pipeline Execution ==============
+function setStep(step, status) {
+  const dots = { material: 'dot-material', topic: 'dot-topic', create: 'dot-create', review: 'dot-review' };
+  const el = document.getElementById(dots[step]);
+  if (!el) return;
+  el.className = 'step-dot ' + (status === 'active' ? 'step-active animate-pulse-glow' : status === 'done' ? 'step-done' : 'step-waiting');
+}
+
+function resetSteps() {
+  ['material','topic','create','review'].forEach(s => setStep(s, 'waiting'));
+}
+
+function showLoading(text) {
+  document.getElementById('welcomeState').classList.add('hidden');
+  document.getElementById('resultState').classList.add('hidden');
+  document.getElementById('loadingState').classList.remove('hidden');
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('statusBadge').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span><span class="text-dark-300">处理中</span>';
+}
+
+function showResult() {
+  document.getElementById('loadingState').classList.add('hidden');
+  document.getElementById('resultState').classList.remove('hidden');
+  document.getElementById('statusBadge').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-dark-300">完成</span>';
+}
+
+function appendResult(title, content, type='default') {
+  const container = document.getElementById('resultContent');
+  const colors = { material: 'from-sky-500/10 to-sky-600/5 border-sky-500/20', topic: 'from-violet-500/10 to-violet-600/5 border-violet-500/20', create: 'from-brand-500/10 to-brand-600/5 border-brand-500/20', review: 'from-emerald-500/10 to-emerald-600/5 border-emerald-500/20', default: 'from-dark-700/50 to-dark-800/50 border-dark-600/20' };
+  const color = colors[type] || colors.default;
+  const div = document.createElement('div');
+  div.className = `slide-in rounded-2xl border bg-gradient-to-br ${color} p-5`;
+  div.innerHTML = `<div class="flex items-center gap-2 mb-3"><span class="text-sm font-semibold text-white">${title}</span></div><div class="markdown-output text-sm leading-relaxed">${renderMarkdown(content)}</div>`;
+  container.appendChild(div);
+  div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
+
+function clearResults() {
+  document.getElementById('resultContent').innerHTML = '';
+}
+
+async function runSingleAgent(agent) {
+  const input = document.getElementById('materialInput').value.trim();
+  if (!input && agent === 'material') { alert('请输入素材内容'); return; }
+
+  resetSteps();
+  clearResults();
+
+  if (agent === 'material') {
+    setStep('material', 'active');
+    showLoading('🔍 素材采集 Agent 正在分析...');
+    try {
+      const userMsg = `素材类型: ${state.sourceType}\n\n素材内容:\n${input}`;
+      let result = '';
+      const out = await callLLM(getSystemPrompt('material'), userMsg, (chunk) => {
+        result = chunk;
+      });
+      if (!out) return;
+      setStep('material', 'done');
+      // Save to library
+      const mat = { id: Date.now(), type: state.sourceType, input: input.substring(0, 200), result: out, time: new Date().toLocaleString() };
+      state.materials.push(mat);
+      localStorage.setItem('wgxnb_materials', JSON.stringify(state.materials));
+      updateLibrary();
+      showResult();
+      appendResult('📥 素材采集结果', out, 'material');
+    } catch (e) {
+      showResult();
+      appendResult('❌ 错误', e.message, 'default');
+    }
+  } else if (agent === 'topic') {
+    setStep('topic', 'active');
+    showLoading('💡 选题策划 Agent 正在分析素材库...');
+    try {
+      const libSummary = state.materials.length > 0
+        ? state.materials.map((m, i) => `素材${i+1} [${m.type}]: ${m.input}`).join('\n')
+        : '素材库为空，请基于AI产品经理领域的通用热点生成选题';
+      const out = await callLLM(getSystemPrompt('topic'), `以下是素材库内容：\n${libSummary}\n\n请生成3个选题推荐。`, null);
+      if (!out) return;
+      setStep('topic', 'done');
+      showResult();
+      appendResult('💡 选题推荐', out, 'topic');
+    } catch (e) {
+      showResult();
+      appendResult('❌ 错误', e.message, 'default');
+    }
+  }
+}
+
+async function runFullPipeline() {
+  const input = document.getElementById('materialInput').value.trim();
+  if (!input) { alert('请输入素材内容'); return; }
+
+  resetSteps();
+  clearResults();
+  showResult();
+
+  const format = state.format === 'auto' ? '请根据素材特征自动选择最佳形式（图文笔记/轮播图/视频脚本）' : state.format;
+
+  // Step 1: Material Collection
+  setStep('material', 'active');
+  appendResult('⏳ 步骤 1/4', '素材采集 Agent 正在分析...', 'material');
+  try {
+    const matResult = await callLLM(
+      getSystemPrompt('material'),
+      `素材类型: ${state.sourceType}\n\n素材内容:\n${input}`,
+      null
+    );
+    if (!matResult) return;
+    setStep('material', 'done');
+    const mat = { id: Date.now(), type: state.sourceType, input: input.substring(0, 200), result: matResult, time: new Date().toLocaleString() };
+    state.materials.push(mat);
+    localStorage.setItem('wgxnb_materials', JSON.stringify(state.materials));
+    updateLibrary();
+    // Replace loading card
+    document.getElementById('resultContent').innerHTML = '';
+    appendResult('📥 素材采集完成', matResult, 'material');
+
+    // Step 2: Topic Planning
+    setStep('topic', 'active');
+    appendResult('⏳ 步骤 2/4', '选题策划 Agent 正在策划...', 'topic');
+    const topicResult = await callLLM(
+      getSystemPrompt('topic'),
+      `基于以下素材分析结果，生成1个最佳选题（含完整大纲），要求形式为${format}，风格为${state.style}：\n\n${matResult}`,
+      null
+    );
+    if (!topicResult) return;
+    setStep('topic', 'done');
+    // Remove loading card, add result
+    document.getElementById('resultContent').lastChild.remove();
+    appendResult('💡 选题策划完成', topicResult, 'topic');
+
+    // Step 3: Content Creation
+    setStep('create', 'active');
+    appendResult('⏳ 步骤 3/4', '内容创作 Agent 正在写作...', 'create');
+    const createResult = await callLLM(
+      getSystemPrompt('create'),
+      `请基于以下选题和大纲，生成完整的小红书内容终稿。\n\n形式要求: ${format}\n写作风格: ${state.style}\n\n选题和大纲：\n${topicResult}\n\n原始素材分析：\n${matResult}`,
+      null
+    );
+    if (!createResult) return;
+    setStep('create', 'done');
+    document.getElementById('resultContent').lastChild.remove();
+    appendResult('✍️ 内容创作完成', createResult, 'create');
+
+    // Step 4: Content Review
+    setStep('review', 'active');
+    appendResult('⏳ 步骤 4/4', '内容审核 Agent 正在审核...', 'review');
+    const reviewResult = await callLLM(
+      getSystemPrompt('review'),
+      `请审核以下小红书内容，给出5维评分和优化后终稿：\n\n${createResult}`,
+      null
+    );
+    if (!reviewResult) return;
+    setStep('review', 'done');
+    document.getElementById('resultContent').lastChild.remove();
+    appendResult('🔍 审核报告 & 终稿', reviewResult, 'review');
+
+    // Save to history
+    state.history.push({ time: new Date().toLocaleString(), input: input.substring(0, 100), result: reviewResult });
+    localStorage.setItem('wgxnb_history', JSON.stringify(state.history));
+
+  } catch (e) {
+    appendResult('❌ 出错了', `${e.message}\n\n请检查设置中的 API Key 和 Base URL 是否正确。`, 'default');
+  }
+  document.getElementById('statusBadge').innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-dark-300">完成</span>';
+}
+
+// ============== UI Helpers ==============
+function switchTab(tab) {
+  ['material','topics','library'].forEach(t => {
+    document.getElementById(`panel-${t}`).classList.toggle('hidden', t !== tab);
+    document.getElementById(`tab-${t}`).className = t === tab ? 'tab-active px-4 py-3 text-sm font-medium transition' : 'tab-inactive px-4 py-3 text-sm font-medium transition';
+  });
+}
+
+function setSourceType(type) {
+  state.sourceType = type;
+  ['随笔','博客','视频','笔记'].forEach(t => {
+    const el = document.getElementById(`src-${t}`);
+    el.className = t === type ? 'px-3 py-1.5 rounded-lg text-xs btn-primary text-white' : 'px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300';
+  });
+}
+
+function setFormat(fmt) {
+  state.format = fmt;
+  ['auto','图文笔记','轮播图','视频脚本'].forEach(f => {
+    const el = document.getElementById(`fmt-${f}`);
+    el.className = f === fmt ? 'px-3 py-1.5 rounded-lg text-xs btn-primary text-white' : 'px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300';
+  });
+}
+
+function setStyle(sty) {
+  state.style = sty;
+  ['干货型','故事型','对比评测型','教程型'].forEach(s => {
+    const el = document.getElementById(`sty-${s}`);
+    el.className = s === sty ? 'px-3 py-1.5 rounded-lg text-xs btn-primary text-white' : 'px-3 py-1.5 rounded-lg text-xs btn-secondary text-dark-300';
+  });
+}
+
+function updateLibrary() {
+  const list = document.getElementById('libraryList');
+  const count = document.getElementById('libraryCount');
+  count.textContent = `${state.materials.length} 条`;
+  if (state.materials.length === 0) {
+    list.innerHTML = '<p class="text-xs text-dark-500 text-center py-8">还没有素材，去"素材输入"标签投喂吧</p>';
+    return;
+  }
+  list.innerHTML = state.materials.map((m, i) => `
+    <div class="material-card glass-light rounded-xl p-3 cursor-pointer" onclick="showMaterialDetail(${i})">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-xs px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-400">${m.type}</span>
+        <span class="text-xs text-dark-500">${m.time}</span>
+      </div>
+      <p class="text-sm text-dark-200 line-clamp-2">${m.input}</p>
+    </div>
+  `).reverse().join('');
+}
+
+function showMaterialDetail(idx) {
+  clearResults();
+  document.getElementById('welcomeState').classList.add('hidden');
+  document.getElementById('loadingState').classList.add('hidden');
+  document.getElementById('resultState').classList.remove('hidden');
+  appendResult(`📥 素材 #${idx + 1}`, state.materials[idx].result, 'material');
+}
+
+// ============== Settings ==============
+function openSettings() {
+  const m = document.getElementById('settingsModal');
+  m.classList.remove('hidden');
+  document.getElementById('cfgProvider').value = state.config.provider;
+  document.getElementById('cfgApiKey').value = state.config.apiKey;
+  document.getElementById('cfgBaseUrl').value = state.config.baseUrl;
+  document.getElementById('cfgModel').value = state.config.model;
+  document.getElementById('cfgPersona').value = state.config.persona;
+  document.getElementById('cfgTagline').value = state.config.tagline;
+}
+
+function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+
+function onProviderChange() {
+  const p = document.getElementById('cfgProvider').value;
+  const presets = {
+    aihubmix: { baseUrl: 'https://aihubmix.com/v1', model: 'deepseek-v3.2' },
+    openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+    deepseek: { baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+    doubao: { baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-pro-256k' },
+    custom: { baseUrl: '', model: '' }
+  };
+  const preset = presets[p];
+  document.getElementById('cfgBaseUrl').value = preset.baseUrl;
+  document.getElementById('cfgModel').value = preset.model;
+}
+
+function saveSettings() {
+  state.config = {
+    provider: document.getElementById('cfgProvider').value,
+    apiKey: document.getElementById('cfgApiKey').value,
+    baseUrl: document.getElementById('cfgBaseUrl').value,
+    model: document.getElementById('cfgModel').value,
+    persona: document.getElementById('cfgPersona').value,
+    tagline: document.getElementById('cfgTagline').value
+  };
+  localStorage.setItem('wgxnb_config', JSON.stringify(state.config));
+  closeSettings();
+}
+
+// ============== Init ==============
+updateLibrary();
+if (!state.config.apiKey) {
+  // Show a subtle hint
+  setTimeout(() => {
+    document.getElementById('statusBadge').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span class="text-dark-300">请先配置 API Key →</span>';
+  }, 1000);
+}
+</script>
+</body>
+</html>
